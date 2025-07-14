@@ -1,6 +1,7 @@
 package org.example.app;
 
 import org.glassfish.embeddable.BootstrapProperties;
+import org.glassfish.embeddable.CommandRunner;
 import org.glassfish.embeddable.GlassFish;
 import org.glassfish.embeddable.GlassFishException;
 import org.glassfish.embeddable.GlassFishProperties;
@@ -10,10 +11,15 @@ import java.io.InputStream;
 import java.lang.System.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.SequencedMap;
 import java.util.logging.LogManager;
+import java.util.stream.Stream;
 
 import static java.lang.System.getLogger;
 import static java.lang.System.Logger.*;
@@ -36,7 +42,7 @@ public class Main {
         }
     }
 
-    public Main() throws GlassFishException {
+    public Main() throws Exception {
 
         try (InputStream is = Main.class.getResourceAsStream("/logging.properties")) {
             LogManager.getLogManager().readConfiguration(is);
@@ -50,20 +56,25 @@ public class Main {
             }
         });
 
-        props = readProperties();
+        if (Files.exists(workDir)) {
+            try (Stream<Path> pathStream = Files.walk(workDir)) {
+                pathStream.sorted(Comparator.reverseOrder()).forEach(Main::delete);
+            }
+        }
 
+        props = readProperties();
         glassFish = GlassFishRuntime
             .bootstrap(new BootstrapProperties())
             .newGlassFish(glassFishProperties());
-
     }
 
     private void run() throws Exception {
 
         glassFish.start();
+        setupGlassfish();
 
         try (InputStream is = Main.class.getResourceAsStream("/" + webApp + ".war")) {
-            glassFish.getDeployer().deploy(is, "--name " + webApp, "--contextroot " + webApp,  "--force true");
+            glassFish.getDeployer().deploy(is, "--name", webApp, "--contextroot", webApp, "--force", "true");
         }
 
         switch (glassFish.getStatus()) {
@@ -71,6 +82,36 @@ public class Main {
             case STARTED        -> log.log(Level.INFO, "GlassFish is started");
             case STOPPING       -> log.log(Level.INFO, "GlassFish is shutting down...");
             default             -> log.log(Level.INFO, "GlassFish is shut down");
+        }
+
+        System.out.println("http://localhost:" + props.get("port") + "/" + webApp);
+
+    }
+
+    private void setupGlassfish() throws Exception {
+
+        Path gfRoot = gfRoot();
+        try (InputStream is = Main.class.getResourceAsStream("/docroot/404.html")) {
+            Files.copy(is, gfRoot.resolve("docroot/404.html"), StandardCopyOption.REPLACE_EXISTING);
+        }
+        try (InputStream is = Main.class.getResourceAsStream("/docroot/robots.txt")) {
+            Files.copy(is, gfRoot.resolve("docroot/robots.txt"), StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        CommandRunner commandRunner = glassFish.getCommandRunner();
+        var commands = props.entrySet().stream()
+            .filter(e -> e.getKey().startsWith("command."))
+            .map(Map.Entry::getValue)
+            .map(line -> line.split("\\s", 2))
+            .toList();
+        for (var command : commands) {
+            log.log(Level.INFO, "# command: {0}", Arrays.toString(command));
+            var result = commandRunner.run(command[0], command[1].split("\\s+(?=([^\"]*\"[^\"]*\")*[^\"]*$)"));
+            switch (result.getExitStatus()) {
+                case SUCCESS -> log.log(Level.INFO,    "# SUCCESS: {0}", result.getOutput());
+                case WARNING -> log.log(Level.WARNING, "# WARNING: {0} {1}", result.getOutput(), result.getFailureCause());
+                default      -> log.log(Level.ERROR,   "# FAILURE: {0}", result.getFailureCause());
+            }
         }
     }
 
@@ -110,8 +151,6 @@ public class Main {
         var properties = new GlassFishProperties();
         properties.setPort("http-listener", Integer.parseInt(props.getOrDefault("port", "8080")));
         properties.setProperty("glassfish.embedded.tmpdir", workDir.toAbsolutePath().toString());
-        properties.setProperty("embedded-glassfish-config.server.admin-service.das-config.autodeploy-enabled", Boolean.FALSE.toString());
-        properties.setProperty("embedded-glassfish-config.server.admin-service.das-config.dynamic-reload-enabled", Boolean.FALSE.toString());
         return properties;
     }
 
