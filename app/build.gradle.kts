@@ -5,6 +5,10 @@ plugins {
 dependencies {
     implementation("org.glassfish.main.extras:glassfish-embedded-all:7.0.25")
     implementation(project(":web", "archives"))
+
+    //runtimeOnly("org.slf4j:slf4j-jdk14:2.0.17")
+    runtimeOnly("org.slf4j:jul-to-slf4j:2.0.17")
+    runtimeOnly("ch.qos.logback:logback-classic:1.5.18")
 }
 
 tasks.named<Jar>("jar") {
