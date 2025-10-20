@@ -8,7 +8,7 @@ repositories {
 
 dependencies {
     constraints {
-        implementation("jakarta.platform:jakarta.jakartaee-api:10.0.0")
+        implementation("jakarta.platform:jakarta.jakartaee-api:11.0.0")
     }
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.13.3")

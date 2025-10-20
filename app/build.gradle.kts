@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    implementation("org.glassfish.main.extras:glassfish-embedded-all:7.0.25")
+    implementation("org.glassfish.main.extras:glassfish-embedded-all:8.0.0-M13")
     implementation(project(":web", "archives"))
 
     //runtimeOnly("org.slf4j:slf4j-jdk14:2.0.17")
