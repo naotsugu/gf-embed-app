@@ -46,3 +46,49 @@ tasks.named<Jar>("jar") {
             "java.base/jdk.internal.vm.annotation")
     }
 }
+
+tasks.register<Exec>("jpackage") {
+
+    dependsOn(tasks.jar)
+
+    val javaToolchainService = project.extensions.getByType(JavaToolchainService::class.java)
+    val jdkPath = javaToolchainService.launcherFor(java.toolchain).get().executablePath
+    println("Toolchain JDK Path: $jdkPath")
+
+    val commandPath = File(jdkPath.asFile.parentFile, "jpackage").absolutePath
+    val outputDir = project.layout.buildDirectory.dir("jpackage")
+    val inputDir = tasks.jar.get().archiveFile.get().asFile.parentFile
+    val os = org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem()
+
+    val commands = mutableListOf(
+        commandPath,
+        "--type", "app-image",
+        "--name", "app",
+        "--dest", outputDir.get().asFile.absolutePath,
+        "--input", inputDir.absolutePath,
+        "--main-jar", tasks.jar.get().archiveFileName.get(),
+        "--main-class", "org.example.app.Main",
+
+        "--java-options", "--add-opens java.base/java.lang=ALL-UNNAMED",
+        "--java-options", "--add-opens java.base/java.io=ALL-UNNAMED",
+        "--java-options", "--add-opens java.base/java.util=ALL-UNNAMED",
+        "--java-options", "--add-opens java.base/sun.nio.fs=ALL-UNNAMED",
+        "--java-options", "--add-opens java.base/java.net=ALL-UNNAMED",
+        "--java-options", "--add-opens java.base/sun.net.www.protocol.jrt=ALL-UNNAMED",
+        "--java-options", "--add-opens java.base/sun.net.www.protocol.jar=ALL-UNNAMED",
+        "--java-options", "--add-opens java.base/jdk.internal.loader=ALL-UNNAMED",
+        "--java-options", "--add-opens java.naming/javax.naming.spi=ALL-UNNAMED",
+        "--java-options", "--add-opens java.rmi/sun.rmi.transport=ALL-UNNAMED",
+        "--java-options", "--add-opens jdk.management/com.sun.management.internal=ALL-UNNAMED",
+        "--java-options", "--add-opens java.base/jdk.internal.vm.annotation=ALL-UNNAMED",
+    )
+    if (os.isWindows) commands.add("--win-console")
+
+    commandLine(commands)
+
+    doFirst {
+        if (outputDir.get().asFile.exists()) {
+            outputDir.get().asFile.deleteRecursively()
+        }
+    }
+}
