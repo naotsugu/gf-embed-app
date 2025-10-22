@@ -15,3 +15,15 @@ java -jar app/build/libs/app.jar
 ./gradlew jpackage
 ```
 
+To run on Windows
+
+```shell
+.\app\build\jpackage\app\app.exe
+```
+
+To run on macOS
+
+```shell
+./app/build/jpackage/app.app/Contents/MacOS/app
+```
+
